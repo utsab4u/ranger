@@ -30,7 +30,11 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.*;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Optional;
@@ -181,7 +185,7 @@ class IdGeneratorTest {
 
     @Test
     void testNodeId() {
-        val generatedId = IdGenerator.generate("TEST123");
+        val generatedId = IdGenerator.generate("TEST");
         val parsedId = IdGenerator.parse(generatedId.getId()).orElse(null);
         Assertions.assertNotNull(parsedId);
         Assertions.assertEquals(parsedId.getNode(), nodeId);
@@ -226,7 +230,7 @@ class IdGeneratorTest {
 
     @Test
     void testParseSuccessAfterGeneration() {
-        val generatedId = IdGenerator.generate("TEST123");
+        val generatedId = IdGenerator.generate("TEST");
         val parsedId = IdGenerator.parse(generatedId.getId()).orElse(null);
         Assertions.assertNotNull(parsedId);
         Assertions.assertEquals(parsedId.getId(), generatedId.getId());

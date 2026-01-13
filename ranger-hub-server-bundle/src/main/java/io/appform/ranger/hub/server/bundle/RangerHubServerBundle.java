@@ -24,9 +24,11 @@ import io.appform.ranger.client.drove.UnshardedRangerDroveHubClient;
 import io.appform.ranger.client.http.UnshardedRangerHttpHubClient;
 import io.appform.ranger.client.zk.UnshardedRangerZKHubClient;
 import io.appform.ranger.common.server.ShardInfo;
+import io.appform.ranger.core.finder.nodeselector.RandomServiceNodeSelector;
 import io.appform.ranger.core.finder.serviceregistry.ListBasedServiceRegistry;
 import io.appform.ranger.core.model.HubConstants;
 import io.appform.ranger.core.model.ServiceNode;
+import io.appform.ranger.core.model.ServiceNodeSelector;
 import io.appform.ranger.core.signals.Signal;
 import io.appform.ranger.drove.config.DroveUpstreamConfig;
 import io.appform.ranger.drove.serde.DroveResponseDataDeserializer;
@@ -44,11 +46,11 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.retry.RetryForever;
 
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.apache.curator.retry.RetryUntilElapsed;
 
 @Slf4j
 @SuppressWarnings("unused")
@@ -56,18 +58,26 @@ import java.util.stream.Collectors;
 public abstract class RangerHubServerBundle<U extends Configuration>
         extends RangerServerBundle<ShardInfo, ListBasedServiceRegistry<ShardInfo>, U> {
 
+    public static final ServiceNodeSelector<ShardInfo> DEFAULT_NODE_SELECTOR = new RandomServiceNodeSelector<>();
+
     protected abstract RangerServerConfiguration getRangerConfiguration(U configuration);
+
+    @SuppressWarnings("java:S1172")
+    protected ServiceNodeSelector<ShardInfo> getServiceNodeSelector(U configuration) {
+        return DEFAULT_NODE_SELECTOR;
+    }
 
     private final List<CuratorFramework> curatorFrameworks = new ArrayList<>();
 
     @Override
     protected List<RangerHubClient<ShardInfo, ListBasedServiceRegistry<ShardInfo>>> withHubs(U configuration) {
         val serverConfig = getRangerConfiguration(configuration);
+        val nodeSelector = getServiceNodeSelector(configuration);
         val upstreams = Objects.<List<RangerUpstreamConfiguration>>requireNonNullElse(
                 serverConfig.getUpstreams(), Collections.emptyList());
         return upstreams.stream()
                 .map(rangerUpstreamConfiguration -> rangerUpstreamConfiguration.accept(new HubCreatorVisitor(
-                        serverConfig.getNamespace(), serverConfig.getExcludedServices())))
+                        serverConfig.getNamespace(), serverConfig.getExcludedServices(), nodeSelector)))
                 .flatMap(Collection::stream)
                 .toList();
     }
@@ -90,13 +100,14 @@ public abstract class RangerHubServerBundle<U extends Configuration>
             ListBasedServiceRegistry<ShardInfo>>>> {
         private final String namespace;
         private final Set<String> excludedServices;
+        private final ServiceNodeSelector<ShardInfo> nodeSelector;
 
         private RangerHubClient<ShardInfo, ListBasedServiceRegistry<ShardInfo>> addCuratorAndGetZkHubClient(
                 String zookeeper, RangerZkUpstreamConfiguration zkConfiguration) {
             val curatorFramework = CuratorFrameworkFactory.builder()
                     .connectString(zookeeper)
                     .namespace(namespace)
-                    .retryPolicy(new RetryForever(HubConstants.CONNECTION_RETRY_TIME_MS))
+                    .retryPolicy(new RetryUntilElapsed(zkConfiguration.getMaxElapsedTimeMs(), HubConstants.SLEEP_MS_BETWEEN_RETRIES))
                     .build();
             curatorFrameworks.add(curatorFramework);
             return UnshardedRangerZKHubClient.<ShardInfo>builder()
@@ -109,6 +120,7 @@ public abstract class RangerHubServerBundle<U extends Configuration>
                     .hubStartTimeoutMs(zkConfiguration.getHubStartTimeoutMs())
                     .nodeRefreshTimeMs(zkConfiguration.getNodeRefreshTimeMs())
                     .excludedServices(excludedServices)
+                    .nodeSelector(nodeSelector)
                     .deserializer(data -> {
                         try {
                             return getMapper().readValue(data, new TypeReference<ServiceNode<ShardInfo>>() {
@@ -133,6 +145,7 @@ public abstract class RangerHubServerBundle<U extends Configuration>
                     .hubStartTimeoutMs(httpConfiguration.getHubStartTimeoutMs())
                     .nodeRefreshTimeMs(httpConfiguration.getNodeRefreshTimeMs())
                     .excludedServices(excludedServices)
+                    .nodeSelector(nodeSelector)
                     .deserializer(data -> {
                         try {
                             return getMapper().readValue(data, new TypeReference<>() {});
@@ -161,6 +174,7 @@ public abstract class RangerHubServerBundle<U extends Configuration>
                     .hubStartTimeoutMs(droveUpstreamConfiguration.getHubStartTimeoutMs())
                     .nodeRefreshTimeMs(droveUpstreamConfiguration.getNodeRefreshTimeMs())
                     .excludedServices(excludedServices)
+                    .nodeSelector(nodeSelector)
                     .deserializer(new DroveResponseDataDeserializer<>() {
                         @Override
                         protected ShardInfo translate(ExposedAppInfo appInfo, ExposedAppInfo.ExposedHost host) {
