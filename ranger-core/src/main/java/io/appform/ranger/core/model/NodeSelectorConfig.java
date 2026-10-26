@@ -18,12 +18,12 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 public abstract class NodeSelectorConfig {
 
     /**
-     * Creates a new selector after validating the algorithm's configuration.
-     * Each invocation returns a fresh instance.
+     * Dispatches to the visitor method for this configuration type.
+     * Selector construction lives in the factory, not in the configuration.
      *
-     * @param <T> the node data type
-     * @return a new selector configured from this object
-     * @throws IllegalArgumentException if the configuration is invalid
+     * @param visitor the visitor to dispatch to
+     * @param <R> the result type
+     * @return the visitor result
      */
-    public abstract <T> ServiceNodeSelector<T> toServiceNodeSelector();
+    public abstract <R> R accept(NodeSelectorConfigVisitor<R> visitor);
 }

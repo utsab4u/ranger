@@ -1,7 +1,9 @@
 package io.appform.ranger.core.finder.nodeselector;
 
 import io.appform.ranger.core.model.NodeSelectorConfig;
+import io.appform.ranger.core.model.NodeSelectorConfigVisitor;
 import io.appform.ranger.core.model.ServiceNodeSelector;
+import io.appform.ranger.core.model.WeightedNodeSelectorConfig;
 
 import java.util.Objects;
 
@@ -22,6 +24,12 @@ public final class ServiceNodeSelectorFactory {
      * @throws IllegalArgumentException if the algorithm's configuration is invalid
      */
     public static <T> ServiceNodeSelector<T> create(final NodeSelectorConfig config) {
-        return Objects.requireNonNull(config, "config must not be null").toServiceNodeSelector();
+        return Objects.requireNonNull(config, "config must not be null")
+                .accept(new NodeSelectorConfigVisitor<ServiceNodeSelector<T>>() {
+                    @Override
+                    public ServiceNodeSelector<T> visit(final WeightedNodeSelectorConfig weightedConfig) {
+                        return new WeightedRandomServiceNodeSelector<>(weightedConfig);
+                    }
+                });
     }
 }

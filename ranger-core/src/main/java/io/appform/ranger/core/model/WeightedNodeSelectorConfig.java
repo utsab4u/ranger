@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.annotation.OptBoolean;
-import io.appform.ranger.core.finder.nodeselector.WeightedRandomServiceNodeSelector;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -57,7 +56,7 @@ public class WeightedNodeSelectorConfig extends NodeSelectorConfig {
 
     /** {@inheritDoc} */
     @Override
-    public <T> ServiceNodeSelector<T> toServiceNodeSelector() {
-        return new WeightedRandomServiceNodeSelector<>(this);
+    public <R> R accept(final NodeSelectorConfigVisitor<R> visitor) {
+        return visitor.visit(this);
     }
 }
