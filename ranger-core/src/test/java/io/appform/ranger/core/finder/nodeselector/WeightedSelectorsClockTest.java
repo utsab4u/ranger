@@ -70,14 +70,14 @@ class WeightedSelectorsClockTest {
     }
 
     @Test
-    void twoNodeComparisonSelectorNeverPicksColdNodeWhenPairedWithWarmNode() {
+    void pairwiseSelectorNeverPicksColdNodeWhenPairedWithWarmNode() {
         final var coldNode = node("cold", NOW_MS, 1.0);
         final var nodes = new ArrayList<ServiceNode<TestNodeData>>();
         nodes.add(coldNode);
         for (int i = 0; i < 5; i++) {
             nodes.add(node("warm-" + i, NOW_MS - WARMUP_MS, 1.0));
         }
-        final var selector = new TwoNodeComparisonWeightedSelector<>(warmupEnrichers());
+        final var selector = new PairwiseProbabilisticWeightedSelector<>(warmupEnrichers());
 
         for (int i = 0; i < ITERATIONS; i++) {
             assertNotSame(coldNode, selector.select(nodes));

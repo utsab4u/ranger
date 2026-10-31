@@ -50,7 +50,7 @@ public class WeightedRandomServiceNodeSelector<T> implements ServiceNodeSelector
         this.conditionalSelector = new ConditionalNodeSelector<>(
                 condition,
                 new IterativeWeightedSelector<>(weightEnrichers, clock),
-                new TwoNodeComparisonWeightedSelector<>(weightEnrichers)
+                new PairwiseProbabilisticWeightedSelector<>(weightEnrichers)
         );
     }
 
