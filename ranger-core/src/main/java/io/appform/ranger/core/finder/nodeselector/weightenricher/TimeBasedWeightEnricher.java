@@ -3,21 +3,38 @@ package io.appform.ranger.core.finder.nodeselector.weightenricher;
 import io.appform.ranger.core.finder.nodeselector.WarmupProgress;
 import io.appform.ranger.core.model.ServiceNode;
 
+import java.time.Clock;
+import java.util.Objects;
+
 public class TimeBasedWeightEnricher<T> implements WeightEnricher<T> {
 
     private final long minNodeAgeMs;
+    private final Clock clock;
 
     /**
-     * Creates a linear warm-up enricher.
+     * Creates a linear warm-up enricher that measures node age against the system UTC clock.
      *
      * @param minNodeAgeMs healthy age at full weight; zero disables warm-up
      * @throws IllegalArgumentException if the duration is negative
      */
     public TimeBasedWeightEnricher(final long minNodeAgeMs) {
+        this(minNodeAgeMs, Clock.systemUTC());
+    }
+
+    /**
+     * Creates a linear warm-up enricher that measures node age against the given clock.
+     *
+     * @param minNodeAgeMs healthy age at full weight; zero disables warm-up
+     * @param clock the time source used to compute healthy age
+     * @throws IllegalArgumentException if the duration is negative
+     * @throws NullPointerException if the clock is null
+     */
+    public TimeBasedWeightEnricher(final long minNodeAgeMs, final Clock clock) {
         if (minNodeAgeMs < 0) {
             throw new IllegalArgumentException("minNodeAgeMs must be non-negative");
         }
         this.minNodeAgeMs = minNodeAgeMs;
+        this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
     /**
@@ -33,6 +50,6 @@ public class TimeBasedWeightEnricher<T> implements WeightEnricher<T> {
         if (minNodeAgeMs == 0) {
             return 1.0;
         }
-        return WarmupProgress.of(node, System.currentTimeMillis(), minNodeAgeMs);
+        return WarmupProgress.of(node, clock.millis(), minNodeAgeMs);
     }
 }

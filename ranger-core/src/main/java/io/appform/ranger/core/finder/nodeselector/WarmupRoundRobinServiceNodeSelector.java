@@ -3,7 +3,9 @@ package io.appform.ranger.core.finder.nodeselector;
 import io.appform.ranger.core.model.ServiceNode;
 import io.appform.ranger.core.model.ServiceNodeSelector;
 
+import java.time.Clock;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class WarmupRoundRobinServiceNodeSelector<T> implements ServiceNodeSelector<T> {
@@ -11,9 +13,11 @@ public final class WarmupRoundRobinServiceNodeSelector<T> implements ServiceNode
     private final RoundRobinServiceNodeSelector<T> roundRobinSelector = new RoundRobinServiceNodeSelector<>();
     private final long warmupDurationMs;
     private final int maxAttempts;
+    private final Clock clock;
 
     /**
-     * Creates a round-robin selector with bounded, linear warm-up acceptance.
+     * Creates a round-robin selector with bounded, linear warm-up acceptance, measuring
+     * node age against the system UTC clock.
      *
      * @param warmupDurationMs the healthy age for full acceptance, or zero to disable warm-up
      * @param maxAttempts the number of candidate acceptance attempts before uniform fallback;
@@ -21,6 +25,23 @@ public final class WarmupRoundRobinServiceNodeSelector<T> implements ServiceNode
      * @throws IllegalArgumentException if the duration is negative or attempts are not positive
      */
     public WarmupRoundRobinServiceNodeSelector(final long warmupDurationMs, final int maxAttempts) {
+        this(warmupDurationMs, maxAttempts, Clock.systemUTC());
+    }
+
+    /**
+     * Creates a round-robin selector with bounded, linear warm-up acceptance, measuring
+     * node age against the given clock.
+     *
+     * @param warmupDurationMs the healthy age for full acceptance, or zero to disable warm-up
+     * @param maxAttempts the number of candidate acceptance attempts before uniform fallback;
+     *                    attempts may revisit nodes after completing a cycle
+     * @param clock the time source used to compute healthy age
+     * @throws IllegalArgumentException if the duration is negative or attempts are not positive
+     * @throws NullPointerException if the clock is null
+     */
+    public WarmupRoundRobinServiceNodeSelector(final long warmupDurationMs,
+                                               final int maxAttempts,
+                                               final Clock clock) {
         if (warmupDurationMs < 0) {
             throw new IllegalArgumentException("warmupDurationMs must be non-negative");
         }
@@ -29,6 +50,7 @@ public final class WarmupRoundRobinServiceNodeSelector<T> implements ServiceNode
         }
         this.warmupDurationMs = warmupDurationMs;
         this.maxAttempts = maxAttempts;
+        this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
     /**
@@ -53,7 +75,7 @@ public final class WarmupRoundRobinServiceNodeSelector<T> implements ServiceNode
             return roundRobinSelector.select(serviceNodes);
         }
 
-        final var now = System.currentTimeMillis();
+        final var now = clock.millis();
         final var random = ThreadLocalRandom.current();
         for (int attempt = 0; attempt < maxAttempts; attempt++) {
             final var node = roundRobinSelector.select(serviceNodes);

@@ -4,7 +4,9 @@ import io.appform.ranger.core.finder.nodeselector.weightenricher.WeightEnricher;
 import io.appform.ranger.core.model.ServiceNode;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Clock;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -14,9 +16,27 @@ public class IterativeWeightedSelector<T> extends AbstractWeightedSelector<T> {
     private static final long ZERO_WEIGHT_WARN_INTERVAL_MS = 60_000L;
 
     private final AtomicLong lastZeroWeightWarnMs = new AtomicLong(0L);
+    private final Clock clock;
 
+    /**
+     * Creates a selector that rate-limits zero-weight warnings using the system UTC clock.
+     *
+     * @param weightAdjusters the enrichers whose product determines each node's weight
+     */
     public IterativeWeightedSelector(final List<WeightEnricher<T>> weightAdjusters) {
+        this(weightAdjusters, Clock.systemUTC());
+    }
+
+    /**
+     * Creates a selector that rate-limits zero-weight warnings using the given clock.
+     *
+     * @param weightAdjusters the enrichers whose product determines each node's weight
+     * @param clock the time source used to rate-limit zero-weight warnings
+     * @throws NullPointerException if the clock is null
+     */
+    public IterativeWeightedSelector(final List<WeightEnricher<T>> weightAdjusters, final Clock clock) {
         super(weightAdjusters);
+        this.clock = Objects.requireNonNull(clock, "clock must not be null");
     }
 
     /**
@@ -66,7 +86,7 @@ public class IterativeWeightedSelector<T> extends AbstractWeightedSelector<T> {
     }
 
     private void warnAllZeroWeights(final int nodeCount) {
-        final var now = System.currentTimeMillis();
+        final var now = clock.millis();
         final var last = lastZeroWeightWarnMs.get();
         if (now - last >= ZERO_WEIGHT_WARN_INTERVAL_MS && lastZeroWeightWarnMs.compareAndSet(last, now)) {
             log.warn("All {} eligible nodes have zero adjusted weight; falling back to uniform random selection",
