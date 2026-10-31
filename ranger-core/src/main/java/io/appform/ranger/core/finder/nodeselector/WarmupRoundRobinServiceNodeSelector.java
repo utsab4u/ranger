@@ -57,10 +57,8 @@ public final class WarmupRoundRobinServiceNodeSelector<T> implements ServiceNode
         final var random = ThreadLocalRandom.current();
         for (int attempt = 0; attempt < maxAttempts; attempt++) {
             final var node = roundRobinSelector.select(serviceNodes);
-            // Subtract as doubles to avoid overflow for extreme timestamps.
-            final var healthyAgeMs = Math.max(0.0, (double) now - node.getHealthySinceTimeStamp());
-            if (healthyAgeMs >= warmupDurationMs
-                    || random.nextDouble() < healthyAgeMs / warmupDurationMs) {
+            final var progress = WarmupProgress.of(node, now, warmupDurationMs);
+            if (progress >= 1.0 || random.nextDouble() < progress) {
                 return node;
             }
         }

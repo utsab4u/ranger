@@ -6,9 +6,14 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 public class IterativeWeightedSelector<T> extends AbstractWeightedSelector<T> {
+
+    private static final long ZERO_WEIGHT_WARN_INTERVAL_MS = 60_000L;
+
+    private final AtomicLong lastZeroWeightWarnMs = new AtomicLong(0L);
 
     public IterativeWeightedSelector(final List<WeightEnricher<T>> weightAdjusters) {
         super(weightAdjusters);
@@ -41,9 +46,7 @@ public class IterativeWeightedSelector<T> extends AbstractWeightedSelector<T> {
 
         final var random = ThreadLocalRandom.current();
         if (totalWeight == 0.0) {
-            // Should never happen: weight enrichers are expected to keep at least one node routable.
-            log.warn("All {} eligible nodes have zero adjusted weight; falling back to uniform random selection",
-                     nodeCount);
+            warnAllZeroWeights(nodeCount);
             return serviceNodes.get(random.nextInt(nodeCount));
         }
         final var randomValue = random.nextDouble(totalWeight);
@@ -60,5 +63,14 @@ public class IterativeWeightedSelector<T> extends AbstractWeightedSelector<T> {
         }
 
         return serviceNodes.get(low);
+    }
+
+    private void warnAllZeroWeights(final int nodeCount) {
+        final var now = System.currentTimeMillis();
+        final var last = lastZeroWeightWarnMs.get();
+        if (now - last >= ZERO_WEIGHT_WARN_INTERVAL_MS && lastZeroWeightWarnMs.compareAndSet(last, now)) {
+            log.warn("All {} eligible nodes have zero adjusted weight; falling back to uniform random selection",
+                     nodeCount);
+        }
     }
 }

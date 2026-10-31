@@ -1,5 +1,6 @@
 package io.appform.ranger.core.finder.nodeselector.weightenricher;
 
+import io.appform.ranger.core.finder.nodeselector.WarmupProgress;
 import io.appform.ranger.core.model.ServiceNode;
 
 public class TimeBasedWeightEnricher<T> implements WeightEnricher<T> {
@@ -32,8 +33,6 @@ public class TimeBasedWeightEnricher<T> implements WeightEnricher<T> {
         if (minNodeAgeMs == 0) {
             return 1.0;
         }
-        final var currentTime = System.currentTimeMillis();
-        final var healthyAgeMs = Math.max(0.0, (double) currentTime - node.getHealthySinceTimeStamp());
-        return Math.min(1.0, healthyAgeMs / minNodeAgeMs);
+        return WarmupProgress.of(node, System.currentTimeMillis(), minNodeAgeMs);
     }
 }

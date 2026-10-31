@@ -4,6 +4,7 @@ import io.appform.ranger.core.finder.nodeselector.weightenricher.WeightEnricher;
 import io.appform.ranger.core.model.ServiceNode;
 
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class TwoNodeComparisonWeightedSelector<T> extends AbstractWeightedSelector<T> {
@@ -42,14 +43,13 @@ public class TwoNodeComparisonWeightedSelector<T> extends AbstractWeightedSelect
         final var secondNodeIndex = secondCandidateIndex >= firstNodeIndex
                 ? secondCandidateIndex + 1 : secondCandidateIndex;
 
-        return selectFromPair(serviceNodes.get(firstNodeIndex), serviceNodes.get(secondNodeIndex));
+        return selectFromPair(serviceNodes.get(firstNodeIndex), serviceNodes.get(secondNodeIndex), random);
     }
 
     @SuppressWarnings("java:S2245")
-    private ServiceNode<T> selectFromPair(final ServiceNode<T> n1, final ServiceNode<T> n2) {
+    private ServiceNode<T> selectFromPair(final ServiceNode<T> n1, final ServiceNode<T> n2, final Random random) {
         final var firstWeight = adjustWeight(n1);
         final var secondWeight = adjustWeight(n2);
-        final var random = ThreadLocalRandom.current();
         final var maxWeight = Math.max(firstWeight, secondWeight);
         if (maxWeight == 0.0) {
             return random.nextBoolean() ? n1 : n2;
